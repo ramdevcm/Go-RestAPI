@@ -48,6 +48,7 @@ func main() {
 	}
 	r := mux.NewRouter()
 	r.HandleFunc(apiPath, l.getBooks).Methods("GET")
+	r.HandleFunc(apiPath, l.postBook).Methods("POST")
 	http.ListenAndServe(":8080", r)
 }
 
@@ -80,6 +81,34 @@ func (l library) getBooks(w http.ResponseWriter, r *http.Request) {
 	// close connection
 	l.closeConnection(db)
 	log.Println("getbooks was called")
+}
+
+func (l library) postBook(w http.ResponseWriter, r *http.Request) {
+	log.Println("POST book is called")
+	book := Book{}
+	json.NewDecoder(r.Body).Decode(&book)
+	db := l.openConnection()
+	insertQuery, err := db.Prepare("insert into books values (?, ?, ?)")
+	if err != nil {
+		log.Fatalf("Something went wrong %s\n", err.Error())
+	}
+
+	tx, err := db.Begin()
+	if err != nil {
+		log.Fatalf("while begning transaction error %s", err.Error())
+	}
+
+	_, err = tx.Stmt(insertQuery).Exec(book.Id, book.Name, book.Isbn)
+	if err != nil {
+		log.Fatalf("executing the insert command error %s\n", err.Error())
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		log.Fatalf("while commiting the transaction %s\n", err.Error())
+	}
+
+	l.closeConnection(db)
 }
 
 func (l library) openConnection() *sql.DB {
